@@ -30,10 +30,10 @@ rekordbox_xml = vars.REKORDBOX_XML
 # set folders to search
 search_folders = vars.SEARCH_FOLDERS
 
-# if restarting after an error, are there existing csv's
-tracks_csv_filepath = vars.TRACKS_CSV_FILEPATH
-track_years_csv_filepath = tracks_csv_filepath.replace(
-    "tracks.csv", "track-years.csv")
+# full path to the output files
+tracks_csv_filepath = os.path.dirname(__file__) + "/output/tracks.csv"
+track_years_csv_filepath = os.path.dirname(
+    __file__) + "/output/track-years.csv"
 
 
 # -----------  Function defs  ----------- #
@@ -139,7 +139,7 @@ def get_last_processed_track(track_years_csv_filepath):
 
 
 # Find last parsed track and create list of track data tuples based on that
-# args: tuple of the last processed track data, our track data list
+# params: tuple of the last processed track data, our track data list
 # returns an edited track_data_list with only the remaining unprocessed items
 def create_continuation_track_data_list(last_processed_track, track_data_list):
     print("Creating new track_data_list with remaining unprocessed filepaths...")
@@ -172,7 +172,7 @@ def search_for_release_year(track_title, artist):
 
 
 # Updates list of track data tuples with the possible year
-# accepts a list of tuples (from memory) as params
+# params: list of tuples, filepath to the csv we are writing to
 # incrementally writes to a file so if an error occurs, we can restart and
 # not waste credits with checking files that were already run
 def update_track_data_with_possible_year(track_data_list, track_years_csv_filepath):
@@ -218,7 +218,7 @@ def update_track_data_with_possible_year(track_data_list, track_years_csv_filepa
 def output_to_csv(tuple_list, filename):
     print("Writing data to csv file...")
 
-    # write our outputs to the file with our passed filename arg
+    # write our outputs to the file with our filename arg
     file = open(
         f"/Users/jasontakahashi/Documents/Jaytee/Projects/my-projects/song-years/output/{filename}.csv", "w")
 
@@ -369,4 +369,4 @@ def write_year_to_id3_tag(track_years_csv_filepath, starting_idx):
 # get_track_release_year()
 # fix_malformed_data()
 # fix_missing_years(track_years_csv_filepath)
-write_year_to_id3_tag(track_years_csv_filepath, 0)
+# write_year_to_id3_tag(track_years_csv_filepath, 0)
