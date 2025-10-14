@@ -3,3 +3,4 @@ venv
 .env
 output/
 vars.py
+.DS_Store
