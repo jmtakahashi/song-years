@@ -16,6 +16,10 @@ from datetime import datetime
 from urllib.parse import unquote
 from xml.dom import minidom
 from tinytag import TinyTag
+from mutagen import File
+from mutagen.mp4 import MP4
+from mutagen.mp3 import MP3
+from mutagen.easyid3 import EasyID3
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,12 +35,12 @@ rekordbox_xml = vars.REKORDBOX_XML
 search_folders = vars.SEARCH_FOLDERS
 
 # full path to the output files
-tracks_csv_filepath = os.path.dirname(__file__) + "/output/tracks.csv"
-track_years_csv_filepath = os.path.dirname(
+tracks_csv_file_path = os.path.dirname(__file__) + "/output/tracks.csv"
+track_years_csv_file_path = os.path.dirname(
     __file__) + "/output/track-years.csv"
 
 
-# -----------  Function defs  ----------- #
+# -----------  Helper Function defs  ----------- #
 
 # Parse Rekordbox Collection XML
 # returns list of track file paths extracted from the rekordbox.xml
@@ -77,13 +81,13 @@ def parse_rekordbox_xml(rekordbox_xml, search_folders):
 
 
 # Extract track data from file and use to search
-# returns list of tuples [ (filepath, track_title, artist, track_title_formatted, and year) ]
-def extract_track_data(track_filepath_list):
+# returns list of tuples [ (file_path, track_title, artist, track_title_formatted, and year) ]
+def extract_track_data(track_file_path_list):
     print("Extracting data from parsed rekordbox xml...")
 
     track_data_list = []
 
-    for file_path in track_filepath_list:
+    for file_path in track_file_path_list:
         tag: TinyTag = TinyTag.get(file_path)
 
         if tag.year == None:
@@ -103,7 +107,7 @@ def extract_track_data(track_filepath_list):
         track_title_formatted = str(tag.title).replace(
             "(Clean)", "").replace("(Dirty)", "").replace("(Intro)", "").replace("(Intro Clean)", "").replace("(Intro Dirty)", "").replace("(Intro - Clean)", "").replace("(Intro - Dirty)", "").replace("(HH Clean Intro)", "").replace("(HH Dirty Intro)", "").replace("(HH Dirty Mixshow)", "").replace("*", "").strip()
 
-        # create tuple with track filepath, track_title, artist, track_title_formatted and year
+        # create tuple with track file_path, track_title, artist, track_title_formatted and year
         track_info = ('"' + file_path + '"',
                       '"' + str(tag.title) + '"',
                       '"' + str(tag.artist) + '"',
@@ -116,6 +120,7 @@ def extract_track_data(track_filepath_list):
 
 
 # Parse csv file and convert data to list of tuples
+# note: this will remove the 0 index tuple which contains the headers
 def parse_csv_to_tuple_list(csv_file):
     print("Parsing track data from tracks.csv...")
 
@@ -128,21 +133,21 @@ def parse_csv_to_tuple_list(csv_file):
 
 # Get last line written to the track-years.csv (the point where we left off)
 # returns a tuple of the last processed track data
-def get_last_processed_track(track_years_csv_filepath):
+def get_last_processed_track(track_years_csv_file_path):
     print("Getting last processed track...")
 
-    with open(track_years_csv_filepath, 'r') as file:
+    with open(track_years_csv_file_path, 'r') as file:
         reader = reversed(list(csv.reader(file)))
         last_row = next(reader)
 
     return tuple(last_row)
 
 
-# Find last parsed track and create list of track data tuples based on that
+# Create list of track data tuples based on the last track that was processed
 # params: tuple of the last processed track data, our track data list
-# returns an edited track_data_list with only the remaining unprocessed items
+# returns a track_data_list with only the remaining unprocessed tracks
 def create_continuation_track_data_list(last_processed_track, track_data_list):
-    print("Creating new track_data_list with remaining unprocessed filepaths...")
+    print("Creating new track_data_list with remaining unprocessed file paths...")
 
     idx_of_last_processed_item = [idx for idx,
                                   item in enumerate(track_data_list) if item[0] == last_processed_track[0]][0]
@@ -172,16 +177,17 @@ def search_for_release_year(track_title, artist):
 
 
 # Updates list of track data tuples with the possible year
-# params: list of tuples, filepath to the csv we are writing to
+# params: list of track data tuples, file path to the csv we are writing to
+# output a csv file with the possible date added to the end of each row
 # incrementally writes to a file so if an error occurs, we can restart and
-# not waste credits with checking files that were already run
-def update_track_data_with_possible_year(track_data_list, track_years_csv_filepath):
+# not waste openai credits with checking files that were already run
+def update_track_data_with_possible_year(track_data_list, track_years_csv_file_path):
     print("Updating track data with possible release years...")
 
-    is_new_file = not (os.path.exists(track_years_csv_filepath))
+    is_new_file = not (os.path.exists(track_years_csv_file_path))
 
     # open the file that we will incrementally write to or append to
-    file = open(track_years_csv_filepath, "a")
+    file = open(track_years_csv_file_path, "a")
 
     # write header for csv ONLY if file is new file
     if is_new_file:
@@ -242,13 +248,13 @@ def get_track_release_year():
     # tracks to create a track_data_list and pass it to our update_track_data
     # func and avoid parsing the rekordbox xml again or re-searching already
     # finished tracks
-    if (os.path.exists(tracks_csv_filepath)):
+    if (os.path.exists(tracks_csv_file_path)):
         print("Continuing track year updating...")
 
-        orig_track_data_list = parse_csv_to_tuple_list(tracks_csv_filepath)
+        orig_track_data_list = parse_csv_to_tuple_list(tracks_csv_file_path)
 
         last_processed_track = get_last_processed_track(
-            track_years_csv_filepath)
+            track_years_csv_file_path)
 
         cont_track_data_list = create_continuation_track_data_list(
             last_processed_track, orig_track_data_list)
@@ -257,7 +263,7 @@ def get_track_release_year():
         # output_to_csv(cont_track_data_list, "tracks-cont")
 
         update_track_data_with_possible_year(
-            cont_track_data_list, track_years_csv_filepath)
+            cont_track_data_list, track_years_csv_file_path)
 
     else:
         # ensure user has exported a current version of the Rekordbox.xml
@@ -273,7 +279,7 @@ def get_track_release_year():
         output_to_csv(track_data_list, "tracks")
 
         update_track_data_with_possible_year(
-            track_data_list, track_years_csv_filepath)
+            track_data_list, track_years_csv_file_path)
 
 
 # -----------  Fix Malformed Data  ----------- #
@@ -282,19 +288,19 @@ def get_track_release_year():
 # commas were a part of the track file path or artist entry.
 # this finds and fixes it using the correct csv.writeline method
 def fix_malformed_data():
-    track_years_data_list = parse_csv_to_tuple_list(track_years_csv_filepath)
+    track_years_data_list = parse_csv_to_tuple_list(track_years_csv_file_path)
 
     for idx, item in enumerate(track_years_data_list):
         # get index of malformed data which is any tuple longer than 6
         if len(item) > 6:
             # this is the line we will replace in the track-years csv (data is broken on this line)
             broken_data = parse_csv_to_tuple_list(
-                track_years_csv_filepath)[idx]
+                track_years_csv_file_path)[idx]
             print(broken_data)
 
             # this is the item that will be inserted -  coming from tracks.csv (data is still in tact)
             correct_data = parse_csv_to_tuple_list(
-                tracks_csv_filepath)[idx]
+                tracks_csv_file_path)[idx]
             possible_year = search_for_release_year(
                 correct_data[3], correct_data[2])
 
@@ -310,11 +316,11 @@ def fix_malformed_data():
 
 # chatGPT may have not retured a release year.  it this case
 # the entered year is "0".  this re-queries those entries.
-def fix_missing_years(track_years_csv_filepath):
-    track_years_data_list = parse_csv_to_tuple_list(track_years_csv_filepath)
+def fix_missing_years(track_years_csv_file_path):
+    track_years_data_list = parse_csv_to_tuple_list(track_years_csv_file_path)
 
     for idx, item in enumerate(track_years_data_list):
-        # get index of malformed data which is any item that has "0" as the 6th item
+        # get index of data missing year which is any item that has "0" as the 6th item
         if str(item[5]) == "0":
             possible_year = search_for_release_year(
                 item[3], item[2])
@@ -336,37 +342,87 @@ def fix_missing_years(track_years_csv_filepath):
 
 # -----------  Write Results to ID3 Tag  ----------- #
 
-def write_year_to_id3_tag(track_years_csv_filepath, starting_idx):
-    track_data_tuple_list = parse_csv_to_tuple_list(track_years_csv_filepath)
+# gets the file type so that mutagen can handle properly
+def get_file_format(file_path):
+    audio = File(file_path)
+    if audio is not None:
+        return audio.mime[0]  # Returns the MIME type
+    return "Unknown format"
+
+
+# gets the current year based on file type
+def get_year(file_path, file_mime_type):
+    if file_mime_type == "audio/mp4":
+        return MP4(file_path).tags.get("\xa9day", [None])[-1]
+
+    elif file_mime_type == "audio/mp3":
+        audio = EasyID3(file_path)
+        return audio["date"]
+
+    else:
+        print("Audio format unknown")
+        return None
+
+
+# sets the current year based on file type
+def set_year(file_path, year, file_mime_type):
+    if file_mime_type == "audio/mp4":
+        tags = MP4(file_path).tags
+        tags["\xa9day"] = year
+        tags.save(file_path)
+
+    elif file_mime_type == "audio/mp3":
+        audio = EasyID3(file_path)
+        audio["date"] = year
+        audio.save()
+
+    else:
+        print("Cannot set year for this audio format.")
+
+
+def write_year_to_id3_tag(track_years_csv_file_path, starting_idx):
+    track_data_tuple_list = parse_csv_to_tuple_list(track_years_csv_file_path)
 
     if starting_idx:
         track_data_tuple_list = track_data_tuple_list[starting_idx:]
 
     for idx, item in enumerate(track_data_tuple_list):
-        if not item[4] == item[5]:
+        (file_path, track_name, artist,
+         formatted_track_name, curr_year, found_year) = item
+
+        if not curr_year == found_year:
             save_data = input(
-                f"Year for {item[3]} by {item[2]} is {item[4]}.  Overwrite with {item[5]} (y/n/q): ")
+                f"Year for {formatted_track_name} by {artist} is {curr_year}.  Overwrite with {found_year} (y/n/q): ")
 
             if save_data == "y":
                 # write to id3 tag
-                print("fake writing to id3 tag")
+                file_type = get_file_format(file_path)
+
+                if file_type == "Unknown format":
+                    print(
+                        "Current track is of unknown format, will not attempt to write year...skipping")
+                    continue
+
+                print(f"Writing {found_year} to ID3 tag...")
+                set_year(file_path, found_year, file_type)
                 continue
 
             elif save_data == "n":
+                print(f"==> Skipping current track...")
                 continue
 
             elif save_data == "q":
-                print(f"==> Continue next time with index {idx}")
+                print(f"==> Continue next time with starting_index={idx}")
                 break
 
             else:
                 print(
-                    f"==> Improper input, exiting.  Continue next time with index {idx}")
+                    f"==> Improper input...exiting.  Continue next time with starting_index={idx}")
                 break
 
 
 # -----------  Run App Funcs  ----------- #
 # get_track_release_year()
 # fix_malformed_data()
-# fix_missing_years(track_years_csv_filepath)
-# write_year_to_id3_tag(track_years_csv_filepath, 0)
+# fix_missing_years(track_years_csv_file_path)
+# write_year_to_id3_tag(track_years_csv_file_path, 0)
