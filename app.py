@@ -319,25 +319,33 @@ def fix_malformed_data():
 def fix_missing_years(track_years_csv_file_path):
     track_years_data_list = parse_csv_to_tuple_list(track_years_csv_file_path)
 
-    for idx, item in enumerate(track_years_data_list):
-        # get index of data missing year which is any item that has "0" as the 6th item
-        if str(item[5]) == "0":
-            possible_year = search_for_release_year(
-                item[3], item[2])
+    proceed = input(
+        f"There are {len(track_years_data_list)} tracks that need to be rechecked.  Would you like to continue? (y/n): ")
 
-            # convert item to list
-            track_data = list(item)
+    if proceed == "y":
 
-            # replace "0" with possible year
-            track_data[5] = possible_year
+        for idx, item in enumerate(track_years_data_list):
+            # get index of data missing year which is any item that has "0" as the 6th item
+            if str(item[5]) == "0":
+                possible_year = search_for_release_year(
+                    item[3], item[2])
 
-            # convert back to tuple
-            corrected_item = track_data
+                # convert item to list
+                track_data = list(item)
 
-            # replace the current item in the track_data_list with updated item
-            track_years_data_list[idx] = corrected_item
+                # replace "0" with possible year
+                track_data[5] = possible_year
 
-    output_to_csv(track_years_data_list, "track-years")
+                # convert back to tuple
+                corrected_item = track_data
+
+                # replace the current item in the track_data_list with updated item
+                track_years_data_list[idx] = corrected_item
+
+        output_to_csv(track_years_data_list, "track-years")
+
+    else:
+        exit()
 
 
 # -----------  Write Results to ID3 Tag  ----------- #
