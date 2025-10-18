@@ -41,15 +41,6 @@ holds values particular to each user.
 
 ## Run the app
 `$ source venv/bin/activate`
-
-`$ python3 app.py arg1 [arg2]`
-
-`arg1` is required and can be "get-years", "fix-data", "fix-missing-years" or "write-years"
-
-if `arg1` is "write-years" then a second arg of either "missing" or "differing" is required
-
-- "missing" will write year to ID3 tags of tracks where the current tagged year is unset (missing or None) and a found year exists.
-
-- "differing" will write year to ID3 tags of tracks where the currently tagged year is different than the found year.  The found year will overwrite the current year.
+`$ python3 app.py`
 
 
