@@ -12,6 +12,9 @@ import vars
 import os
 import csv
 
+import pyfiglet
+from termcolor import colored
+
 from openai import OpenAI
 from datetime import datetime
 from urllib.parse import unquote
@@ -46,6 +49,11 @@ track_years_csv_file_path = os.path.dirname(
 # Parse Rekordbox Collection XML
 # returns list of track file paths extracted from the rekordbox.xml
 def parse_rekordbox_xml(rekordbox_xml, search_folders):
+    """
+    Parses a rekordbox.xml file and extracts
+    the file paths into a list.  Returns the list
+    of filepaths.
+    """
     print("Parsing rekordbox.xml...")
 
     # list of files (file paths) in the rekordbox collection
@@ -82,47 +90,57 @@ def parse_rekordbox_xml(rekordbox_xml, search_folders):
 
 
 # Extract track data from file, given the file path
-# returns list of lists [ [file_path, track_title, artist, track_title_formatted, and year] ]
-def extract_track_data(track_file_path_list):
+# returns list of track data [file_path, track_title, artist, track_title_formatted, and year]
+def extract_track_data(track_file_path):
+    """
+    Gets the track information from the track's
+    metadata tags.
+    """
     print("Extracting data from parsed rekordbox xml...")
 
-    track_data_list = []
+    tag: TinyTag = TinyTag.get(track_file_path)
 
-    for file_path in track_file_path_list:
-        tag: TinyTag = TinyTag.get(file_path)
+    # format existing year to 4 digits
+    if tag.year == None:
+        year = tag.year
 
-        # format existing year to 4 digits
-        if tag.year == None:
+    else:
+        if len(tag.year) == 4:
             year = tag.year
 
+        elif len(tag.year) == 10:
+            dt = datetime.strptime(tag.year, "%Y-%m-%d")
+            year = dt.year
+
         else:
-            if len(tag.year) == 4:
-                year = tag.year
+            dt = datetime.strptime(tag.year, "%Y-%m-%dT%H:%M:%SZ")
+            year = dt.year
 
-            elif len(tag.year) == 10:
-                dt = datetime.strptime(tag.year, "%Y-%m-%d")
-                year = dt.year
+    # format track title
+    track_title_formatted = str(tag.title).replace(
+        "(Clean)", "").replace("(Dirty)", "").replace("(Intro)", "").replace("(Intro Clean)", "").replace("(Intro Dirty)", "").replace("(Intro - Clean)", "").replace("(Intro - Dirty)", "").replace("(HH Clean Intro)", "").replace("(HH Dirty Intro)", "").replace("(HH Dirty Mixshow)", "").replace("*", "").strip()
 
-            else:
-                dt = datetime.strptime(tag.year, "%Y-%m-%dT%H:%M:%SZ")
-                year = dt.year
+    # create list with [file_path, track_title, artist, track_title_formatted, year]
+    track_data_item = [track_file_path, str(tag.title), str(
+        tag.artist), track_title_formatted, str(year)]
 
-        # format track title
-        track_title_formatted = str(tag.title).replace(
-            "(Clean)", "").replace("(Dirty)", "").replace("(Intro)", "").replace("(Intro Clean)", "").replace("(Intro Dirty)", "").replace("(Intro - Clean)", "").replace("(Intro - Dirty)", "").replace("(HH Clean Intro)", "").replace("(HH Dirty Intro)", "").replace("(HH Dirty Mixshow)", "").replace("*", "").strip()
+    # extra check to make sure the data going into our list is properly
+    # formatted. there should be only 5 items in the track data list item.
+    if (len(track_data_item) > 5):
+        print("==> Malformed track data detected: ", track_data_item)
+        raise ValueError(
+            "Track data list item contains more entries than it is supposed to.")
 
-        # create list with [file_path, track_title, artist, track_title_formatted, year]
-        track_info = [file_path, str(tag.title), str(
-            tag.artist), track_title_formatted, str(year)]
-
-        track_data_list.append(track_info)
-
-    return track_data_list
+    return track_data_item
 
 
 # Parse csv file and convert data to list of lists
 # note: this will remove the 0 index tuple which contains the headers
 def parse_csv_to_list(csv_file_path):
+    """
+    Converts a csv file to a list of track data items.
+    Track data items are also a list of the tracks data.
+    """
     print("Parsing track data from csv file...")
 
     with open(csv_file_path) as file:
@@ -134,8 +152,11 @@ def parse_csv_to_list(csv_file_path):
 
 
 # Get last line written to the track-years.csv (the point where we left off)
-# returns a list of the last processed track data
+# returns a list of the last processed track data [file_path, track_title, artist, track_title_formatted, year, possible_year]
 def get_last_processed_track(track_years_csv_file_path):
+    """
+    Given a csv filpath, returns the last line of the file.
+    """
     print("Getting last processed track...")
 
     with open(track_years_csv_file_path, 'r') as file:
@@ -180,48 +201,33 @@ def search_for_release_year(track_title, artist):
     return possible_release_year
 
 
-# Appends possible year to each track data list item.
-# Incrementally writes to csv so if an error occurs, we can restart without
-# reprocessing already processed tracks.
-# params: list of track data lists, file path to the csv we are writing to
-def update_track_data_with_possible_year(track_data_list, track_years_csv_file_path):
+# Appends possible year to a track data list item where no possible exists.
+# return: updated track data item [file_path, track_title, artist, track_title_formatted, year, found_year]
+def update_track_data_with_possible_year(track_data_item):
+    """
+    Updates a track data item with possible release year.
+    """
     print("Updating track data with possible release years...")
 
-    is_new_file = not (os.path.exists(track_years_csv_file_path))
+    # extract track formatted title and artist from track data tuple
+    track_title_formatted = track_data_item[3]
+    artist = track_data_item[2]
 
-    # open the file that we will incrementally write to or append to
-    file = open(track_years_csv_file_path, "a")
+    # send inquiry to chatGPT
+    possible_release_year = search_for_release_year(
+        track_title_formatted, artist)
 
-    # write header for csv ONLY if file is new file
-    if is_new_file:
-        file.write(
-            "Location, Track Title, Artist, Track Title Formatted, Year, Possible Year\n")
+    # add possible release year to track data
+    track_data_item.append(possible_release_year)
 
-    for track_data in track_data_list:
-        # extract track formatted title and artist from track data tuple
-        track_title_formatted = track_data[3]
-        artist = track_data[2]
+    # extra check to make sure the data going into our list is properly
+    # formatted. there should be only 6 items in the track data list item.
+    if (len(track_data_item) > 6):
+        print("==> Malformed track data detected: ", track_data_item)
+        raise ValueError(
+            "Track data list item contains more entries than it is supposed to.")
 
-        # send inquiry to chatGPT
-        possible_release_year = search_for_release_year(
-            track_title_formatted, artist)
-
-        # add possible release year to track data
-        track_data.append(possible_release_year)
-
-        # extra check to make sure the data going into our list is properly
-        # formatted. there should be only 6 items in the track data list item.
-        if (len(track_data) > 6):
-            print("==> Malformed track data detected: ", track_data)
-            raise ValueError(
-                "Track data list item contains more entries than it is supposed to.")
-
-        # write new line to csv file containing updated track data
-        writer = csv.writer(file, quoting=csv.QUOTE_ALL)
-        writer.writerow(track_data)
-
-    # close the file
-    file.close()
+    return track_data_item
 
 
 # Output results to file.  will overwrite existing files
@@ -270,8 +276,19 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
             # optional: write our continuation track list to a new file
             output_to_csv(cont_track_data_list, "tracks-continued")
 
-            update_track_data_with_possible_year(
-                cont_track_data_list, track_years_csv_file_path)
+            # open the csv file that we will append to
+            file = open(track_years_csv_file_path, "a")
+
+            for track_data_item in cont_track_data_list:
+                update_track_data_with_possible_year(track_data_item)
+
+                # Incrementally writes to csv so if an error occurs,
+                # we can restart without reprocessing already processed tracks.
+                writer = csv.writer(file, quoting=csv.QUOTE_ALL)
+                writer.writerow(track_data)
+
+            # close the file
+            file.close()
 
             print("Finished track year updating.")
             exit()
@@ -290,13 +307,30 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
             rekordbox_collection_files = parse_rekordbox_xml(
                 rekordbox_xml_file_path, search_folders)
 
-            track_data_list = extract_track_data(rekordbox_collection_files)
+            track_data_list = []
+            for file_path in rekordbox_collection_files:
+                track_data = extract_track_data(file_path)
+                track_data_list.append(track_data)
 
             # write our track data list to file
             output_to_csv(track_data_list, "tracks")
 
-            update_track_data_with_possible_year(
-                track_data_list, track_years_csv_file_path)
+            # create the file that we will incrementally write to
+            file = open(track_years_csv_file_path, "w")
+
+            # write header for csv since this is a going to be a fresh write
+            file.write(
+                "Location, Track Title, Artist, Track Title Formatted, Year, Possible Year\n")
+
+            for track_data_item in track_data_list:
+                update_track_data_with_possible_year(track_data_item)
+                # Incrementally writes to csv so if an error occurs,
+                # we can restart without reprocessing already processed tracks.
+                writer = csv.writer(file, quoting=csv.QUOTE_ALL)
+                writer.writerow(track_data)
+
+            # close the file
+            file.close()
 
         else:
             print("Quitting script...")
@@ -516,38 +550,62 @@ def write_track_release_years(track_years_csv_file_path, type):
         exit()
 
 
-# -----------  Run App Funcs  ----------- #
+# -----------  Run App  ----------- #
 
-if len(sys.argv) == 1:
-    print("Please add one of the following args: \"get-years\", \"fix-data\", \"fix-missing-years\", \"write-years\".")
-    exit()
+title = "Track Release Years"
+color = "cyan"
+print(colored(pyfiglet.figlet_format(title, font="slant"), color))
+print("-------------------- by https://whoisjaytee.com --------------------\n")
 
-if sys.argv[1] == "get-years":
-    get_track_release_year(tracks_csv_file_path, track_years_csv_file_path,
-                           rekordbox_xml_file_path, search_folders)
+function_to_run = input(colored(
+    "Please enter of the following: \"get-years\", \"fix-missing-years\", \"write-years\": ", color))
 
-elif sys.argv[1] == "fix-data":
-    fix_malformed_data(tracks_csv_file_path, track_years_csv_file_path)
+while not str(function_to_run).lower() in ["get-years", "fix-missing-years", "write-years", "q"]:
+    function_to_run = input(
+        "Please enter either \"get-years\", \"fix-missing-years\" or \"write-years\" or type \"q\" to exit: ")
 
-elif sys.argv[1] == "fix-missing-years":
-    fix_missing_years(track_years_csv_file_path)
-
-elif sys.argv[1] == "write-years":
-    if len(sys.argv) < 3:
-        print("Please include either \"missing\" or \"differing\" as a second argument.")
-        print("==> Add \"missing\" to write tracks where tagged year is unset (missing or None) and found year is not 0.")
-        print("==> Add \"differing\" to write tracks where the tagged year is different than the found year.")
+if function_to_run == "get-years":
+    proceed = input(f"\"{function_to_run}\" entered. Ok to proceed? (y/n): ")
+    if str(proceed).lower() == "y":
+        get_track_release_year(tracks_csv_file_path, track_years_csv_file_path,
+                               rekordbox_xml_file_path, search_folders)
+    else:
+        print(colored("Quitting script...", color="magenta"))
         exit()
 
-    if not (sys.argv[2] == "missing" or sys.argv[2] == "differing"):
-        print(f"\"{sys.argv[2]}\" is not a valid argument.")
-        print("Please include either \"missing\" or \"differing\" as a second argument.")
-        print("==> Add \"missing\" to write tracks where tagged year is unset (missing or None) and found year is not 0.")
-        print("==> Add \"differing\" to write tracks where the tagged year is different than the found year.")
+elif function_to_run == "fix-missing-years":
+    proceed = input(f"\"{function_to_run}\" entered. Ok to proceed? (y/n): ")
+    if str(proceed).lower() == "y":
+        fix_missing_years(track_years_csv_file_path)
+    else:
+        print(colored("Quitting script...", color="magenta"))
         exit()
 
-    write_track_release_years(track_years_csv_file_path, sys.argv[2])
+elif function_to_run == "write-years":
+    print(colored(
+        f"\"{function_to_run}\" entered. Please enter either \"missing\" or \"differing\".", color))
+    print("==> Enter \"missing\" to write tracks where tagged year is unset (missing or None) and found year is not 0.")
+    print("==> Enter \"differing\" to write tracks where the tagged year is different than the found year.")
+    type_of_years = input(colored(
+        "Please enter your selection here, or type \"q\" to exit: ", color))
+
+    while not str(type_of_years).lower() in ["missing", "differing", "q"]:
+        type_of_years = input(
+            "Please enter either \"missing\" or \"differing\" or type \"q\" to exit: ")
+
+    if type_of_years in ["missing", "differing"]:
+        proceed = input(
+            colored(f"\"{type_of_years}\" entered. Ok to proceed? (y/n): ", color))
+        if str(proceed).lower() == "y":
+            write_track_release_years(track_years_csv_file_path, type_of_years)
+        else:
+            print(colored("Quitting script...", color="magenta"))
+            exit()
+
+    else:
+        print(colored("Quitting script...", color="magenta"))
+        exit()
 
 else:
-    print(f"Please add one of the following args when running script: \"get-years\", \"fix-data\", \"fix-missing-years\", \"write-years\".")
+    print(colored("Quitting script...", color="magenta"))
     exit()
