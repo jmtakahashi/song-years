@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # gets list of files from rekordbox and gets track data for each track.
@@ -11,6 +12,7 @@ import sys
 import vars
 import os
 import csv
+import functools
 
 import pyfiglet
 from termcolor import colored
@@ -45,6 +47,16 @@ track_years_csv_file_path = os.path.dirname(
 
 
 # -----------  Helper Function Defs  ----------- #
+
+# Check if a func is being called from inside another func
+def calltracker(func):
+    @functools.wraps(func)
+    def wrapper(*args):
+        wrapper.has_been_called = True
+        return func(*args)
+    wrapper.has_been_called = False
+    return wrapper
+
 
 # Parse Rekordbox Collection XML
 # returns list of track file paths extracted from the rekordbox.xml
@@ -183,26 +195,49 @@ def create_continuation_track_data_list(last_processed_track, track_data_list):
 
 
 # Send request for track release year
-# returns the possible release year
+# returns the possible release year, 0, "skip" or "quit"
 def search_for_release_year(track_title, artist):
-    print("\nSending chatGPT query...")
+    print(f"\nSending chatGPT query for {track_title} by {artist}...")
+
     response = client.responses.create(
         model="gpt-5-nano",
         input=f"What year was {track_title} by {artist} released?  I only want the 4 digit exact release year."
     )
 
     if len(response.output_text) == 4:
-        possible_release_year = response.output_text
-    else:
-        print(f"==> Respose malformed for {track_title} by {artist}")
-        print(f"==> response: {response.output_text}")
-        possible_release_year = 0
+        return response.output_text
 
-    return possible_release_year
+    else:
+        print(
+            colored(f"==> Response not a year for {track_title} by {artist}", color))
+        print(
+            colored(f"==> Chat response: {response.output_text}", color="red"))
+
+        if update_track_data_with_possible_year.has_been_called:
+            return "0"
+
+        if fix_missing_years.has_been_called:
+            while True:
+                user_response = input(
+                    colored("Your reply \"skip\", enter your own year, or \"quit\"): ", color))
+
+                if len(user_response) == 4:
+                    if user_response == "quit":
+                        return "quit"
+
+                    if user_response == "skip":
+                        return "0"
+
+                    try:
+                        return int(user_response)
+
+                    except ValueError:
+                        continue
 
 
 # Appends possible year to a track data list item where no possible exists.
 # return: updated track data item [file_path, track_title, artist, track_title_formatted, year, found_year]
+@calltracker
 def update_track_data_with_possible_year(track_data_item):
     """
     Updates a track data item with possible release year.
@@ -363,7 +398,7 @@ def fix_malformed_data(tracks_csv_file_path, track_years_csv_file_path):
 
         #     track_years_data_list[idx] = correct_data
 
-        # -----------------------------------------------------#
+        # ----------------------------------------------------- #
 
         # this is the line we will replace in the track-years csv (data is broken on this line)
         broken_data = item
@@ -386,6 +421,7 @@ def fix_malformed_data(tracks_csv_file_path, track_years_csv_file_path):
 
 # chatGPT may have not retured a release year.  it this case
 # the entered year is "0".  this func re-queries those entries.
+@calltracker
 def fix_missing_years(track_years_csv_file_path):
     track_years_data_list = parse_csv_to_list(track_years_csv_file_path)
 
@@ -394,8 +430,8 @@ def fix_missing_years(track_years_csv_file_path):
     missing_years_track_list = [
         (idx, item) for idx, item in enumerate(track_years_data_list) if item[5] == "0"]
 
-    proceed = input(
-        f"There are {len(missing_years_track_list)} tracks that need to be rechecked.  Would you like to continue? (y/n): ")
+    proceed = input(colored(
+        f"There are {len(missing_years_track_list)} tracks that need to be rechecked.  Would you like to continue? (y/n): ", color))
 
     if proceed.lower() == "y":
 
@@ -408,8 +444,26 @@ def fix_missing_years(track_years_csv_file_path):
             possible_year = search_for_release_year(
                 formatted_track_name, artist)
 
-            # add possible_year to track data
-            track_data_item.append(str(possible_year))
+            # return vals will be either a "0", 4 digit year str, or "quit"
+            # if a string of "quit" is returned for the possible year
+            # the user wants to exit.  we need to break out of the
+            # current for loop, write results and exit the script
+            if possible_year == "quit":
+                break
+
+            if possible_year == "0":
+                print(colored("Skipping current track...", color))
+                continue
+
+            else:
+                print(colored(
+                    f"Adding {possible_year} to {formatted_track_name} by {artist}...", color))
+
+            # replace "missing" year with new possible_year
+            track_data_item[5] = possible_year
+
+            if len(track_data_item) == 7:
+                track_data_item.pop(6)
 
             # replace the current track_data_item in the track_data_list with updated track_data_item
             track_years_data_list[idx_in_track_years_list] = track_data_item
@@ -557,46 +611,48 @@ color = "cyan"
 print(colored(pyfiglet.figlet_format(title, font="slant"), color))
 print("-------------------- by https://whoisjaytee.com --------------------\n")
 
-function_to_run = input(colored(
-    "Please enter of the following: \"get-years\", \"fix-missing-years\", \"write-years\": ", color))
+function_to_run = ""
 
-while not str(function_to_run).lower() in ["get-years", "fix-missing-years", "write-years", "q"]:
-    function_to_run = input(
-        "Please enter either \"get-years\", \"fix-missing-years\" or \"write-years\" or type \"q\" to exit: ")
+while not function_to_run.lower() in ["1", "2", "3", "q"]:
+    print(colored("Please enter a number to start:", color))
+    function_to_run = input(colored(
+        "=> \"1\" to get all track years\n=> \"2\" to fix missing track years\n=> \"3\" to write track years to meta tags\n=> or type \"q\" to exit.\nYour choice: ", color="white"))
 
-if function_to_run == "get-years":
-    proceed = input(f"\"{function_to_run}\" entered. Ok to proceed? (y/n): ")
-    if str(proceed).lower() == "y":
+if function_to_run == "1":
+    proceed = input(colored(
+        f"\"1. Get all track years\" entered. Ok to proceed? (y/n): ", color))
+    if proceed.lower() == "y":
         get_track_release_year(tracks_csv_file_path, track_years_csv_file_path,
                                rekordbox_xml_file_path, search_folders)
     else:
         print(colored("Quitting script...", color="magenta"))
         exit()
 
-elif function_to_run == "fix-missing-years":
-    proceed = input(f"\"{function_to_run}\" entered. Ok to proceed? (y/n): ")
-    if str(proceed).lower() == "y":
+elif function_to_run == "2":
+    proceed = input(colored(
+        f"\"2. Get missing track years\" entered. Ok to proceed? (y/n): ", color))
+    if proceed.lower() == "y":
         fix_missing_years(track_years_csv_file_path)
     else:
         print(colored("Quitting script...", color="magenta"))
         exit()
 
-elif function_to_run == "write-years":
+elif function_to_run == "3":
     print(colored(
-        f"\"{function_to_run}\" entered. Please enter either \"missing\" or \"differing\".", color))
+        f"\"3. Write track years to meta data\" entered. Please enter either \"missing\" or \"differing\".", color))
     print("==> Enter \"missing\" to write tracks where tagged year is unset (missing or None) and found year is not 0.")
     print("==> Enter \"differing\" to write tracks where the tagged year is different than the found year.")
-    type_of_years = input(colored(
-        "Please enter your selection here, or type \"q\" to exit: ", color))
 
-    while not str(type_of_years).lower() in ["missing", "differing", "q"]:
+    type_of_years = ""
+
+    while not type_of_years.lower() in ["missing", "differing", "q"]:
         type_of_years = input(
             "Please enter either \"missing\" or \"differing\" or type \"q\" to exit: ")
 
     if type_of_years in ["missing", "differing"]:
         proceed = input(
             colored(f"\"{type_of_years}\" entered. Ok to proceed? (y/n): ", color))
-        if str(proceed).lower() == "y":
+        if proceed.lower() == "y":
             write_track_release_years(track_years_csv_file_path, type_of_years)
         else:
             print(colored("Quitting script...", color="magenta"))
