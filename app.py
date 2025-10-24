@@ -219,16 +219,17 @@ def search_for_release_year(track_title, artist):
 
     if fix_missing_years.has_been_called:
 
-        print(f"\nNext track to query for: {track_title} by {artist}")
+        print(
+            colored(f"\nNext track to query for: {track_title} by {artist}", color))
 
         while True:
-            user_response = input(
-                "Hit \"enter\" to query, enter your own 4 digit year, or type \"skip\" to skip this track, or \"quit\" to exit: ")
+            user_response = input(colored(
+                "Enter \"run\" to query, enter your own 4 digit year, press the return button to skip this track, or enter \"quit\" to exit: ", color="white"))
 
-            if user_response == "":
+            if user_response.lower() == "run":
                 break
 
-            if user_response.lower() == "skip":
+            if user_response == "":
                 return "0"
 
             if user_response.lower() == "quit":
