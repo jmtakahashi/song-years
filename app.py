@@ -219,7 +219,7 @@ def search_for_release_year(track_title, artist):
 
     if fix_missing_years.has_been_called:
 
-        print(f"\Next track to query for: {track_title} by {artist}")
+        print(f"\nNext track to query for: {track_title} by {artist}")
 
         while True:
             proceed = input(
