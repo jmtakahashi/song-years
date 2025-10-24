@@ -223,13 +223,16 @@ def search_for_release_year(track_title, artist):
 
         while True:
             user_response = input(
-                "Hit \"enter\" to query, enter your own 4 digit year, or type \"skip\" to skip this track: ")
+                "Hit \"enter\" to query, enter your own 4 digit year, or type \"skip\" to skip this track, or \"quit\" to exit: ")
 
             if user_response == "":
                 break
 
             if user_response.lower() == "skip":
                 return "0"
+
+            if user_response.lower() == "quit":
+                return "quit"
 
             if len(user_response) == 4:
                 try:
@@ -492,7 +495,7 @@ def fix_missing_years(track_years_csv_file_path):
                 break
 
             if possible_year == "0":
-                print(colored("Skipping current track...", color))
+                print(colored("Skipping current track...", color="magenta"))
                 continue
 
             else:
