@@ -222,7 +222,7 @@ def search_for_release_year(track_title, artist):
     if fix_missing_years.has_been_called:
 
         print(
-            colored(f"\nNext track to query for: {track_title} by {artist}", color="cyan"))
+            colored(f"\nNext track to query for: {track_title} by {artist}", color="white"))
 
         while True:
             user_response = input(colored(
