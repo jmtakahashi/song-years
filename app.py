@@ -228,7 +228,7 @@ def search_for_release_year(track_title, artist):
             if proceed == "":
                 break
 
-            if proceed.toLower() == "skip":
+            if proceed.lower() == "skip":
                 return "0"
 
             if len(proceed) == 4:
