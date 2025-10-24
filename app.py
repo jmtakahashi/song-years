@@ -712,7 +712,7 @@ elif function_to_run == "3":
 
         if proceed.lower() == "y":
             write_track_release_years(
-                track_years_csv_file_path, type_of_years="missing")
+                track_years_csv_file_path, "missing")
         else:
             print(colored("Quitting script...", color="magenta"))
             exit()
@@ -723,7 +723,7 @@ elif function_to_run == "3":
 
         if proceed.lower() == "y":
             write_track_release_years(
-                track_years_csv_file_path, type_of_years="differing")
+                track_years_csv_file_path, "differing")
         else:
             print(colored("Quitting script...", color="magenta"))
             exit()
