@@ -222,16 +222,16 @@ def search_for_release_year(track_title, artist):
         print(f"\nNext track to query for: {track_title} by {artist}")
 
         while True:
-            proceed = input(
+            user_response = input(
                 "Hit \"enter\" to query, enter your own 4 digit year, or type \"skip\" to skip this track: ")
 
-            if proceed == "":
+            if user_response == "":
                 break
 
-            if proceed.lower() == "skip":
+            if user_response.lower() == "skip":
                 return "0"
 
-            if len(proceed) == 4:
+            if len(user_response) == 4:
                 try:
                     return int(user_response)
 
@@ -253,6 +253,9 @@ def search_for_release_year(track_title, artist):
                 colored(f"==> Response not a year for {track_title} by {artist}", color))
             print(
                 colored(f"==> Chat response: {response.output_text}", color="red"))
+
+            # reinit user_response variable
+            user_response = ""
 
             while True:
                 user_response = input(
