@@ -349,7 +349,7 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
             "==> track-years.csv file exists. Continue track year updating? (y/n) ", color="magenta"))
 
         if proceed.lower() == "y":
-            print(colored("Continuing getting track years...", color))
+            print(colored("Continuing getting track years...", color="white"))
 
             orig_track_data_list = parse_csv_to_list(tracks_csv_file_path)
 
