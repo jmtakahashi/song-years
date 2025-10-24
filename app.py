@@ -266,7 +266,7 @@ def search_for_release_year(track_title, artist):
 
             while True:
                 user_response = input(
-                    colored("Your reply - \"skip\", enter your own year, or \"quit\"): ", color))
+                    colored("Your reply - \"skip\", enter your own year, or \"quit\"): ", color="cyan"))
 
                 if len(user_response) == 4:
                     if user_response == "quit":
@@ -380,7 +380,7 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
             # close the file
             file.close()
 
-            print(colored("Finished track year updating.", color))
+            print(colored("Finished track year updating.", color="white"))
             exit()
 
         else:
@@ -486,7 +486,7 @@ def fix_missing_years(track_years_csv_file_path):
         (idx, item) for idx, item in enumerate(track_years_data_list) if item[5] == "0"]
 
     proceed = input(colored(
-        f"There are {len(missing_years_track_list)} tracks that need to be rechecked.  Would you like to continue? (y/n): ", color))
+        f"There are {len(missing_years_track_list)} tracks that need to be rechecked.  Would you like to continue? (y/n): ", color="cyan"))
 
     if proceed.lower() == "y":
 
@@ -512,7 +512,7 @@ def fix_missing_years(track_years_csv_file_path):
 
             else:
                 print(colored(
-                    f"Adding {possible_year} to {formatted_track_name} by {artist}...", color))
+                    f"Adding {possible_year} to {formatted_track_name} by {artist}...", color="white"))
 
             # replace "missing" year with new possible_year
             track_data_item[5] = possible_year
