@@ -197,26 +197,63 @@ def create_continuation_track_data_list(last_processed_track, track_data_list):
 # Send request for track release year
 # returns the possible release year, 0, "skip" or "quit"
 def search_for_release_year(track_title, artist):
-    print(f"\nSending chatGPT query for {track_title} by {artist}...")
+    if update_track_data_with_possible_year.has_been_called:
 
-    response = client.responses.create(
-        model="gpt-5-nano",
-        input=f"What year was {track_title} by {artist} released?  I only want the 4 digit exact release year."
-    )
+        print(f"\nSending chatGPT query for {track_title} by {artist}...")
 
-    if len(response.output_text) == 4:
-        return response.output_text
+        response = client.responses.create(
+            model="gpt-5-nano",
+            input=f"What year was {track_title} by {artist} released?  I only want the 4 digit exact release year."
+        )
 
-    else:
-        print(
-            colored(f"==> Response not a year for {track_title} by {artist}", color))
-        print(
-            colored(f"==> Chat response: {response.output_text}", color="red"))
+        if len(response.output_text) == 4:
+            return response.output_text
 
-        if update_track_data_with_possible_year.has_been_called:
+        else:
+            print(
+                colored(f"==> Response not a year for {track_title} by {artist}", color))
+            print(
+                colored(f"==> Chat response: {response.output_text}", color="red"))
+
             return "0"
 
-        if fix_missing_years.has_been_called:
+    if fix_missing_years.has_been_called:
+
+        print(f"\Next track to query for: {track_title} by {artist}")
+
+        while True:
+            proceed = input(
+                "Hit \"enter\" to query, enter your own 4 digit year, or type \"skip\" to skip this track: ")
+
+            if proceed == "":
+                break
+
+            if proceed.toLower() == "skip":
+                return "0"
+
+            if len(proceed) == 4:
+                try:
+                    return int(user_response)
+
+                except ValueError:
+                    continue
+
+        print(f"\nSending chatGPT query for {track_title} by {artist}...")
+
+        response = client.responses.create(
+            model="gpt-5-nano",
+            input=f"What year was {track_title} by {artist} released?  I only want the 4 digit exact release year."
+        )
+
+        if len(response.output_text) == 4:
+            return response.output_text
+
+        else:
+            print(
+                colored(f"==> Response not a year for {track_title} by {artist}", color))
+            print(
+                colored(f"==> Chat response: {response.output_text}", color="red"))
+
             while True:
                 user_response = input(
                     colored("Your reply \"skip\", enter your own year, or \"quit\"): ", color))
