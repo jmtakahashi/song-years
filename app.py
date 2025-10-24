@@ -666,7 +666,7 @@ def write_track_release_years(track_years_csv_file_path, type):
 
 print(colored(pyfiglet.figlet_format(
     "Track Release Years", font="slant"), color="cyan"))
-print(colored("-------------------- by https://whoisjaytee.com --------------------\n", color="white"))
+print(colored("<----------------- by https://whoisjaytee.com ----------------->\n", color="white"))
 
 function_to_run = ""
 
