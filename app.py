@@ -108,7 +108,8 @@ def extract_track_data(track_file_path):
     Gets the track information from the track's
     metadata tags.
     """
-    print(colored("Extracting data from parsed rekordbox xml...", color="white"))
+
+    print(colored(f"Processing {track_file_path}...", color="white"))
 
     tag: TinyTag = TinyTag.get(track_file_path)
 
@@ -196,119 +197,48 @@ def create_continuation_track_data_list(last_processed_track, track_data_list):
 
 
 # Send request for track release year
-# returns the possible release year, 0, "skip" or "quit"
-def search_for_release_year(track_title, artist):
-    if update_track_data_with_possible_year.has_been_called:
+# returns the possible release year or 0
+def search_for_release_year(track_title, artist, set_year):
+    """
+    Sends a query for the 4 digit track year.
+    """
 
-        print(colored(
-            f"\nSending chatGPT query for {track_title} by {artist}...", color="white"))
+    print(colored(
+        f"\nSending chatGPT query for {track_title} by {artist}...", color="white"))
 
-        response = client.responses.create(
-            model="gpt-5-nano",
-            input=f"What year was {track_title} by {artist} released?  I only want the 4 digit exact release year."
-        )
+    response = client.responses.create(
+        model="gpt-5-nano",
+        input=f"What year was {track_title} by {artist} released?  Please return only exact 4 digit exact release year."
+    )
 
-        if len(response.output_text) == 4:
-            return response.output_text
-
-        else:
-            print(
-                colored(f"==> Response not a year for {track_title} by {artist}", color="white"))
-            print(
-                colored(f"==> Chat response: {response.output_text}", color="red"))
-
-            return "0"
-
-    if fix_missing_years.has_been_called:
-
+    if len(response.output_text) == 4:
+        return response.output_text
+    else:
         print(
-            colored(f"\nNext track to query for: {track_title} by {artist}", color="white"))
-
-        while True:
-            user_response = input(colored(
-                "Enter \"run\" to query, enter your own 4 digit year, press the return button to skip this track, or enter \"quit\" to exit: ", color="cyan"))
-
-            if user_response.lower() == "run":
-                break
-
-            if user_response == "":
-                return "0"
-
-            if user_response.lower() == "quit":
-                return "quit"
-
-            if len(user_response) == 4:
-                try:
-                    return int(user_response)
-
-                except ValueError:
-                    continue
-
+            colored(f"==> Response not a 4 digit year for {track_title} by {artist}", color="white"))
         print(
-            colored(f"\nSending chatGPT query for {track_title} by {artist}...", color="cyan"))
+            colored(f"==> Chat response: {response.output_text}", color="red"))
 
-        response = client.responses.create(
-            model="gpt-5-nano",
-            input=f"What year was {track_title} by {artist} released?  I only want the 4 digit exact release year."
-        )
-
-        if len(response.output_text) == 4:
-            return response.output_text
-
-        else:
-            print(
-                colored(f"==> Response not a year for {track_title} by {artist}", color="white"))
-            print(
-                colored(f"==> Chat response: {response.output_text}", color="red"))
-
-            # reinit user_response variable
-            user_response = ""
-
-            while True:
-                user_response = input(
-                    colored("Your reply - \"skip\", enter your own year, or \"quit\"): ", color="cyan"))
-
-                if len(user_response) == 4:
-                    if user_response == "quit":
-                        return "quit"
-
-                    if user_response == "skip":
-                        return "0"
-
-                    try:
-                        return int(user_response)
-
-                    except ValueError:
-                        continue
+        return "0"
 
 
 # Appends possible year to a track data list item where no possible exists.
 # return: updated track data item [file_path, track_title, artist, track_title_formatted, year, found_year]
 @calltracker
-def update_track_data_with_possible_year(track_data_item):
+def update_track_data_with_possible_year(track_data_item, updated_year):
     """
     Updates a track data item with possible release year.
     """
-    print(colored("Updating track data with possible release years...", color="white"))
 
-    # extract track formatted title and artist from track data tuple
     track_title_formatted = track_data_item[3]
     artist = track_data_item[2]
+    set_year = track_data_item[4]
 
-    # send inquiry to chatGPT
-    possible_release_year = search_for_release_year(
-        track_title_formatted, artist)
+    print(colored(
+        f"Updating {track_title_formatted} by {artist} with {updated_year}...", color="white"))
 
     # add possible release year to track data
-    track_data_item.append(possible_release_year)
-
-    # extra check to make sure the data going into our list is properly
-    # formatted. there should be only 6 items in the track data list item.
-    if (len(track_data_item) > 6):
-        print(colored("==> Malformed track data detected: " +
-              str(track_data_item), color="white"))
-        raise ValueError(
-            "Track data list item contains more entries than it is supposed to.")
+    track_data_item.append(updated_year)
 
     return track_data_item
 
@@ -370,7 +300,8 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
             file = open(track_years_csv_file_path, "a")
 
             for track_data_item in cont_track_data_list:
-                update_track_data_with_possible_year(track_data_item)
+                track_data = update_track_data_with_possible_year(
+                    track_data_item)
 
                 # Incrementally writes to csv so if an error occurs,
                 # we can restart without reprocessing already processed tracks.
@@ -380,14 +311,14 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
             # close the file
             file.close()
 
-            print(colored("Finished track year updating.", color="white"))
+            print(colored("Finished getting track years.  Exiting...", color="white"))
             exit()
 
         else:
             print(colored("Quitting script...", color="magenta"))
             exit()
 
-    # starting a fresh operation with not tracks.csv present
+    # starting a fresh operation with tracks.csv not present
     else:
         # ensure user has exported a current version of the Rekordbox.xml
         proceed = input(colored(
@@ -396,6 +327,8 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
         if proceed.lower() == "y":
             rekordbox_collection_files = parse_rekordbox_xml(
                 rekordbox_xml_file_path, search_folders)
+
+            print(colored("Extracting data from parsed rekordbox xml...", color="white"))
 
             track_data_list = []
             for file_path in rekordbox_collection_files:
@@ -413,7 +346,8 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
                 "Location, Track Title, Artist, Track Title Formatted, Year, Possible Year\n")
 
             for track_data_item in track_data_list:
-                update_track_data_with_possible_year(track_data_item)
+                track_data = update_track_data_with_possible_year(
+                    track_data_item)
                 # Incrementally writes to csv so if an error occurs,
                 # we can restart without reprocessing already processed tracks.
                 writer = csv.writer(file, quoting=csv.QUOTE_ALL)
@@ -421,6 +355,9 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
 
             # close the file
             file.close()
+
+            print(colored("Finished getting track years.  Exiting...", color="white"))
+            exit()
 
         else:
             print(colored("Quitting script...", color="magenta"))
@@ -493,11 +430,16 @@ def fix_missing_years(track_years_csv_file_path):
         # loop through each item, get the year again, and replace the
         # item in our main_track_years_data_list with the updated item
         for (idx_in_track_years_list, track_data_item) in missing_years_track_list:
+            # working - refactoring to use update_tracck_data_with_possible_year()
+            # track_data = update_track_data_with_possible_year(track_data_item)
+            #
+
             artist = track_data_item[2]
             formatted_track_name = track_data_item[3]
+            set_year = track_data_item[4]
 
             possible_year = search_for_release_year(
-                formatted_track_name, artist)
+                formatted_track_name, artist, set_year)
 
             # return vals will be either a "0", 4 digit year str, or "quit"
             # if a string of "quit" is returned for the possible year
@@ -516,9 +458,6 @@ def fix_missing_years(track_years_csv_file_path):
 
             # replace "missing" year with new possible_year
             track_data_item[5] = possible_year
-
-            if len(track_data_item) == 7:
-                track_data_item.pop(6)
 
             # replace the current track_data_item in the track_data_list with updated track_data_item
             track_years_data_list[idx_in_track_years_list] = track_data_item
