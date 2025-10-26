@@ -423,6 +423,7 @@ def fix_malformed_data(tracks_csv_file_path, track_years_csv_file_path):
 
 # chatGPT may have not retured a release year.  it this case
 # the entered year is "0".  this func re-queries those entries.
+# and alternatively allows user to enter their own found year.
 def fix_missing_years(track_years_csv_file_path):
     track_years_data_list = parse_csv_to_list(track_years_csv_file_path)
 
