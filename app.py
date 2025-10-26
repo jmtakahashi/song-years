@@ -48,23 +48,12 @@ track_years_csv_file_path = os.path.dirname(
 
 # -----------  Helper Function Defs  ----------- #
 
-# Check if a func is being called from inside another func
-# def calltracker(func):
-#     @functools.wraps(func)
-#     def wrapper(*args):
-#         wrapper.has_been_called = True
-#         return func(*args)
-#     wrapper.has_been_called = False
-#     return wrapper
-
-
 # Parse Rekordbox Collection XML
 # returns list of track file paths extracted from the rekordbox.xml
 def parse_rekordbox_xml(rekordbox_xml, search_folders):
     """
-    Parses a rekordbox.xml file and extracts
-    the file paths into a list.  Returns the list
-    of filepaths.
+    Parses a rekordbox.xml file and extracts the file paths
+    into a list.  Returns the list of filepaths.
     """
     print(colored("Parsing rekordbox.xml...", color="white"))
 
@@ -105,8 +94,7 @@ def parse_rekordbox_xml(rekordbox_xml, search_folders):
 # returns list of track data [file_path, track_title, artist, track_title_formatted, and year]
 def extract_track_data(track_file_path):
     """
-    Gets the track information from the track's
-    metadata tags.
+    Gets the track information from the track's metadata tags.
     """
 
     print(colored(f"Processing {track_file_path}...", color="white"))
@@ -184,6 +172,9 @@ def get_last_processed_track(track_years_csv_file_path):
 # params: list of the last processed track data, our main track data list
 # returns: new track_data_list with only the remaining unprocessed tracks
 def create_continuation_track_data_list(last_processed_track, track_data_list):
+    """
+    Creates a list of remaining track data items for us to process.
+    """
     print(colored("Creating new track_data_list with remaining unprocessed file paths...", color="white"))
 
     idx_of_last_processed_item = [idx for idx,
@@ -236,7 +227,7 @@ def update_track_data_with_possible_year(track_data_item, updated_year):
         f"Updating {track_title_formatted} by {artist} with {updated_year}...", color="white"))
 
     # add possible release year to track data
-    track_data_item.append(updated_year)
+    track_data_item[5] = updated_year
 
     return track_data_item
 
@@ -374,51 +365,6 @@ def get_track_release_year(tracks_csv_file_path, track_years_csv_file_path, reko
             exit()
 
 
-# -----------  Fix Malformed Data  ----------- #
-
-# data could have been malformed by bad csv writes where
-# commas were a part of the track file path or artist entry.
-# this finds and fixes it using the correct csv.writeline method
-def fix_malformed_data(tracks_csv_file_path, track_years_csv_file_path):
-    track_years_data_list = parse_csv_to_list(track_years_csv_file_path)
-    tracks_data_list = parse_csv_to_list(tracks_csv_file_path)
-
-    for idx, item in enumerate(track_years_data_list):
-        # # get index of malformed data which is any tuple longer than 6
-        # if len(item) > 6:
-        #     # this is the line we will replace in the track-years.csv (data is broken on this line)
-        #     broken_data = track_years_data_list[idx]
-        #     print(broken_data)
-
-        #     # this is the item that will be inserted -  coming from tracks.csv (data is still in tact)
-        #     correct_data = tracks_data_list[idx]
-
-        #     possible_year = search_for_release_year(
-        #         correct_data[3], correct_data[2])
-
-        #     correct_data = correct_data.append(possible_year)
-
-        #     track_years_data_list[idx] = correct_data
-
-        # ----------------------------------------------------- #
-
-        # this is the line we will replace in the track-years csv (data is broken on this line)
-        broken_data = item
-        possible_year = broken_data[5]
-        print(broken_data)
-
-        # this is the item that will be inserted -  coming from tracks.csv (data is still in tact)
-        correct_data = tracks_data_list[idx]
-
-        # add the possible year from the tracks_years_data_list to the correct data
-        correct_data.append(possible_year)
-        print(correct_data)
-
-        track_years_data_list[idx] = correct_data
-
-    output_to_csv(track_years_data_list, "track-years")
-
-
 # -----------  Fix Missing Track Years  ----------- #
 
 # chatGPT may have not retured a release year.  it this case
@@ -440,9 +386,6 @@ def fix_missing_years(track_years_csv_file_path):
         # loop through each item, get the year again, and replace the
         # item in our main_track_years_data_list with the updated item
         for (idx_in_track_years_list, track_data_item) in missing_years_track_list:
-            # working - refactoring to use update_tracck_data_with_possible_year()
-            # track_data = update_track_data_with_possible_year(track_data_item)
-
             artist = track_data_item[2]
             formatted_track_name = track_data_item[3]
             set_year = track_data_item[4]
@@ -450,13 +393,9 @@ def fix_missing_years(track_years_csv_file_path):
             print(
                 colored(f"\nNext track to query for: {formatted_track_name} by {artist} with set year {set_year}", color="white"))
 
-            # return vals will be either a "0", 4 digit year str, or "quit"
-            # if a string of "quit" is returned for the possible year
-            # the user wants to exit.  we need to break out of the
-            # current for loop, write results and exit the script
-
             user_response = None
             user_entered_year = None
+            year_to_add + None
 
             while True:
                 user_response = input(colored(
@@ -487,22 +426,18 @@ def fix_missing_years(track_years_csv_file_path):
                     print(colored("Skipping current track...", color="magenta"))
                     break
 
-                # ... OR replace "0" year with user-entered year
-                track_data_item[5] = found_year
-
-                # replace the current track_data_item in the track_data_list with updated track_data_item
-                track_years_data_list[idx_in_track_years_list] = track_data_item
+                year_to_add = found_year
 
             # user entered their own 4 digit year
             else:
-                print(colored(
-                    f"Adding {user_entered_year} to {formatted_track_name} by {artist}...", color="white"))
+                year_to_add = user_entered_year
 
-                # replace "missing" year with user-entered year
-                track_data_item[5] = user_entered_year
+            # replace "missing" year with user-entered year
+            track_data_item = update_track_data_with_possible_year(
+                track_data_item, year_to_add)
 
-                # replace the current track_data_item in the track_data_list with updated track_data_item
-                track_years_data_list[idx_in_track_years_list] = track_data_item
+            # replace the current track_data_item in the track_data_list with updated track_data_item
+            track_years_data_list[idx_in_track_years_list] = track_data_item
 
         # write updated data to csv
         output_to_csv(track_years_data_list, "track-years")
@@ -522,7 +457,7 @@ def get_file_format(file_path):
             return audio.mime[0]  # Returns the MIME type
         return "Unknown format"
     else:
-        return None
+        return None  # for files that don't exist
 
 
 # gets the current year based on file type
@@ -556,51 +491,14 @@ def set_year(file_path, year, file_mime_type):
         print(colored("Cannot set year for this audio format.", color="magenta"))
 
 
-# writes the year to ID3 tag based on the file type and
-# updates entry in the track data list for rewriting to
-# csv so we know what years have been updated
-# (matching years no longer need processing)
-def write_tag_based_on_file_type_and_update_track_data_list(track_data_list, idx_in_track_data_list, track_data_item):
-    file_path = track_data_item[0]
-    found_year = track_data_item[5]
-
-    file_type = get_file_format(file_path)
-
-    if file_type == None:
-        print(
-            f"{file_path} doesn't exist, please check for errors. skipping...")
-
-    elif file_type == "Unknown format":
-        print(
-            "Current track is of unknown format, will not attempt to write year...skipping")
-
-    elif file_type == "audio/mp3" or file_type == "audio/mp4":
-        print(
-            f"Current track is of \"{file_type}\" format. Writing \"{found_year}\" to ID3 tag...")
-
-        set_year(file_path, found_year, file_type)
-
-        # after setting year, update the current track_data_item with the new year
-        track_data_item[4] = found_year
-        # set the track_data_item in the track_data_list to the updated track_data_item
-        track_data_list[idx_in_track_data_list
-                        ] = track_data_item
-
-    else:
-        print(colored(
-            f"Current track is of \"{file_type}\" format.  Script doesn't account for this file format.", color="magenta"))
-        print(colored(
-            f"Please contact to developer to add support for this file format.", color="magenta"))
-        print(colored("Skipping track...", color="white"))
-
-
-# write year to ID3 tags for tracks
+# write year to ID3 tags
 # type == "missing": tagged year unset, found year is not 0
 # type == "differing" tagged year different from found year
 def write_track_release_years(track_years_csv_file_path, type):
     track_data_list = parse_csv_to_list(track_years_csv_file_path)
 
     tracks_to_write = []
+    proceed = None
 
     if type == "missing":
         tracks_to_write = [
@@ -629,11 +527,39 @@ def write_track_release_years(track_years_csv_file_path, type):
     if proceed.lower() == "y":
         print(colored("Continuing...", color="white"))
 
-        for idx_in_track_data_list, item in tracks_to_write:
+        for idx_in_track_data_list, track_data_item in tracks_to_write:
+            file_path = track_data_item[0]
+            found_year = track_data_item[5]
 
-            # write to id3 tag
-            write_tag_based_on_file_type_and_update_track_data_list(
-                track_data_list, idx_in_track_data_list, item)
+            file_type = get_file_format(file_path)
+
+            if file_type == None:
+                print(colored(
+                    f"{file_path} doesn't exist, please check for errors. skipping...", color="magenta"))
+
+            elif file_type == "Unknown format":
+                print(colored(
+                    "Current track is of unknown format, will not attempt to write year...skipping", color="magenta"))
+
+            elif file_type == "audio/mp3" or file_type == "audio/mp4":
+                print(colored(
+                    f"Current track is of \"{file_type}\" format. Writing \"{found_year}\" to ID3 tag...", color="white"))
+
+                set_year(file_path, found_year, file_type)
+
+                # after setting year in ID3 tag, update the current track_data_item with the new year
+                track_data_item[4] = found_year
+
+                # set the track_data_item in the track_data_list to the updated track_data_item
+                track_data_list[idx_in_track_data_list
+                                ] = track_data_item
+
+            else:
+                print(colored(
+                    f"Current track is of \"{file_type}\" format.  This script doesn't account for this file format.", color="magenta"))
+                print(colored(
+                    f"Please contact the developer to add support for this file format.", color="magenta"))
+                print(colored("Skipping track...", color="magenta"))
 
         # write the updated track_data_list to the track_years_csv file
         output_to_csv(track_data_list, "track-years")
