@@ -8,11 +8,9 @@
 
 # uses rekordbox.xml to get the list of files in the Rekordbox collection.
 
-import sys
 import vars
 import os
 import csv
-import functools
 
 import pyfiglet
 from termcolor import colored
@@ -395,7 +393,7 @@ def fix_missing_years(track_years_csv_file_path):
 
             user_response = None
             user_entered_year = None
-            year_to_add + None
+            year_to_add = None
 
             while True:
                 user_response = input(colored(
@@ -571,66 +569,73 @@ def write_track_release_years(track_years_csv_file_path, type):
 
 # -----------  Run App  ----------- #
 
-print(colored(pyfiglet.figlet_format(
-    "Track Release Years", font="slant"), color="cyan"))
-print(colored("<----------------- by https://whoisjaytee.com ----------------->\n", color="white"))
-
-function_to_run = ""
-
-while not function_to_run.lower() in ["1", "2", "3", "q"]:
-    print(colored("Please enter a number to start:", color="cyan"))
-    function_to_run = input(colored(
-        "=> \"1\" to get all track years\n=> \"2\" to fix missing track years\n=> \"3\" to write track years to meta tags\n=> or type \"q\" to exit.\nYour choice: ", color="white"))
-
-if function_to_run == "1":
-    proceed = input(
-        colored("\"1. Get all track years\" entered. Ok to proceed? (y/n): ", color="cyan"))
-    if proceed.lower() == "y":
-        get_track_release_year(tracks_csv_file_path, track_years_csv_file_path,
-                               rekordbox_xml_file_path, search_folders)
-    else:
-        print(colored("Quitting script...", color="magenta"))
-        exit()
-
-elif function_to_run == "2":
-    proceed = input(colored(
-        "\"2. Get missing track years\" entered. Ok to proceed? (y/n): ", color="cyan"))
-    if proceed.lower() == "y":
-        fix_missing_years(track_years_csv_file_path)
-    else:
-        print(colored("Quitting script...", color="magenta"))
-        exit()
-
-elif function_to_run == "3":
+def main(rekordbox_xml_file_path, search_folders, tracks_csv_file_path, track_years_csv_file_path):
+    print(colored(pyfiglet.figlet_format(
+        "Track Release Years", font="slant"), color="cyan"))
     print(colored(
-        f"\"3. Write track years to meta data\" entered. Please enter one of the following:", color="cyan"))
-    print(colored("==> \"1\" to write tracks where tagged year is unset (missing or None) and found year is not 0.", color="white"))
-    print(colored("==> \"2\" to write tracks where the tagged year is different than the found year.", color="white"))
+        "<----------------- by https://whoisjaytee.com ----------------->\n", color="white"))
 
-    type_of_years = ""
+    function_to_run = ""
 
-    while not type_of_years.lower() in ["1", "2", "q"]:
-        type_of_years = input(colored(
-            "Please enter either \"1\" or \"2\" or type \"q\" to exit: ", color="cyan"))
+    while not function_to_run.lower() in ["1", "2", "3", "q"]:
+        print(colored("Please enter a number to start:", color="cyan"))
+        function_to_run = input(colored(
+            "=> \"1\" to get all track years\n=> \"2\" to fix missing track years\n=> \"3\" to write track years to meta tags\n=> or type \"q\" to exit.\nYour choice: ", color="white"))
 
-    if type_of_years == "1":
+    if function_to_run == "1":
         proceed = input(
-            colored("\"1 - write missing years\" entered. Ok to proceed? (y/n): ", color="cyan"))
-
+            colored("\"1. Get all track years\" entered. Ok to proceed? (y/n): ", color="cyan"))
         if proceed.lower() == "y":
-            write_track_release_years(
-                track_years_csv_file_path, "missing")
+            get_track_release_year(tracks_csv_file_path, track_years_csv_file_path,
+                                   rekordbox_xml_file_path, search_folders)
         else:
             print(colored("Quitting script...", color="magenta"))
             exit()
 
-    if type_of_years == "2":
-        proceed = input(
-            colored("\"2 - write differing years\" entered. Ok to proceed? (y/n): ", color="cyan"))
-
+    elif function_to_run == "2":
+        proceed = input(colored(
+            "\"2. Get missing track years\" entered. Ok to proceed? (y/n): ", color="cyan"))
         if proceed.lower() == "y":
-            write_track_release_years(
-                track_years_csv_file_path, "differing")
+            fix_missing_years(track_years_csv_file_path)
+        else:
+            print(colored("Quitting script...", color="magenta"))
+            exit()
+
+    elif function_to_run == "3":
+        print(colored(
+            f"\"3. Write track years to meta data\" entered. Please enter one of the following:", color="cyan"))
+        print(colored("==> \"1\" to write tracks where tagged year is unset (missing or None) and found year is not 0.", color="white"))
+        print(colored(
+            "==> \"2\" to write tracks where the tagged year is different than the found year.", color="white"))
+
+        type_of_years = ""
+
+        while not type_of_years.lower() in ["1", "2", "q"]:
+            type_of_years = input(colored(
+                "Please enter either \"1\" or \"2\" or type \"q\" to exit: ", color="cyan"))
+
+        if type_of_years == "1":
+            proceed = input(
+                colored("\"1 - write missing years\" entered. Ok to proceed? (y/n): ", color="cyan"))
+
+            if proceed.lower() == "y":
+                write_track_release_years(
+                    track_years_csv_file_path, "missing")
+            else:
+                print(colored("Quitting script...", color="magenta"))
+                exit()
+
+        if type_of_years == "2":
+            proceed = input(
+                colored("\"2 - write differing years\" entered. Ok to proceed? (y/n): ", color="cyan"))
+
+            if proceed.lower() == "y":
+                write_track_release_years(
+                    track_years_csv_file_path, "differing")
+            else:
+                print(colored("Quitting script...", color="magenta"))
+                exit()
+
         else:
             print(colored("Quitting script...", color="magenta"))
             exit()
@@ -639,6 +644,7 @@ elif function_to_run == "3":
         print(colored("Quitting script...", color="magenta"))
         exit()
 
-else:
-    print(colored("Quitting script...", color="magenta"))
-    exit()
+
+if __name__ == "__main__":
+    main(rekordbox_xml_file_path, search_folders,
+         tracks_csv_file_path, track_years_csv_file_path)
