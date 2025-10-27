@@ -11,6 +11,7 @@
 import vars
 import os
 import csv
+import regex
 
 import pyfiglet
 from termcolor import colored
@@ -402,21 +403,18 @@ def fix_missing_years(track_years_csv_file_path):
                 if user_response.lower() in ["run", "quit", "", ]:
                     break
 
-                if len(user_response) == 4:
-                    try:
-                        user_entered_year = int(user_response)
-                        break
-                    except ValueError:
-                        continue
+                if regex.match(r"(?:19|20)\d{2}", user_response):
+                    year_to_add = user_response
+                    break
 
-            if user_response == "quit":
+            if user_response.lower() == "quit":
                 break
 
             if user_response == "":
                 print(colored("Skipping current track...", color="magenta"))
                 continue
 
-            if (user_response == "run"):
+            if user_response.lower() == "run":
                 found_year = search_for_release_year(
                     formatted_track_name, artist, set_year)
 
@@ -425,10 +423,6 @@ def fix_missing_years(track_years_csv_file_path):
                     break
 
                 year_to_add = found_year
-
-            # user entered their own 4 digit year
-            else:
-                year_to_add = user_entered_year
 
             # replace "missing" year with user-entered year
             track_data_item = update_track_data_with_possible_year(
